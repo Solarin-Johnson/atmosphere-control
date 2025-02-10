@@ -7,7 +7,7 @@ export default function App() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.content}>
-        <Meter value={50} maxValue={200} />
+        <Meter value={100} maxValue={200} />
         {/* <Meter value={50} maxValue={200} /> */}
       </SafeAreaView>
     </ThemedView>
@@ -22,6 +22,6 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     gap: 12,
-    paddingLeft: 24,
+    // paddingLeft: 24,
   },
 });
