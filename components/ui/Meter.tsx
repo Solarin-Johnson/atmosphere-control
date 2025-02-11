@@ -9,9 +9,12 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  interpolate,
+  interpolateColor,
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -43,7 +46,7 @@ export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
 
   const panGesture = Gesture.Pan()
     .onBegin(() => {
-      depth.value = withTiming(8, { duration: 150 }); // Press-in effect
+      depth.value = withSpring(8, { duration: 200 }); // Press-in effect
       pressed.value = true;
     })
     .onUpdate(({ y }) => {
@@ -57,7 +60,7 @@ export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
         Math.min(Math.max((newValue / maxValue) * 100, 0), 96) / 100;
     })
     .onFinalize(() => {
-      depth.value = withTiming(0, { duration: 150 }); // Ensures reset on release
+      depth.value = withSpring(0, { duration: 200 }); // Ensures reset on release
       pressed.value = false;
     });
 
@@ -81,7 +84,8 @@ const Scales: React.FC<ScalesProps> = ({ percent, height, pressed }) => {
   const totalLines = 200; // Ensure equal lines on all devices
   const gap = height / totalLines;
   const strokeColor = useThemeColor({}, "text");
-  const lineColor = useThemeColor({}, "tint");
+  const lowColor = useThemeColor({}, "low");
+  const highColor = useThemeColor({}, "high");
   const tapeWidth = 54;
   const range = 15;
 
@@ -99,6 +103,7 @@ const Scales: React.FC<ScalesProps> = ({ percent, height, pressed }) => {
         const startRange = current - range;
         const endRange = startRange + range;
         let curveFactor = 0;
+        const filled = percent.value <= 0 ? 0 : i > endRange - range + 5;
 
         if (startRange - range / 4 <= i && i < endRange + range / 4) {
           const normalized =
@@ -109,7 +114,15 @@ const Scales: React.FC<ScalesProps> = ({ percent, height, pressed }) => {
 
         return {
           transform: [{ translateX: -curveFactor }],
-          ...(isSecondSet && { opacity: i > endRange - range + 5 ? 1 : 0.4 }),
+          stroke: isSecondSet
+            ? !filled
+              ? strokeColor
+              : interpolateColor(percent.value, [0, 1], [highColor, lowColor])
+            : strokeColor,
+          strokeWidth: isSecondSet
+            ? withSpring(pressed.value ? 3.2 : 2.8, { duration: 200 })
+            : 1.5,
+          ...(isSecondSet && { opacity: filled ? 1 : 0.3 }),
         };
       });
 
@@ -120,12 +133,8 @@ const Scales: React.FC<ScalesProps> = ({ percent, height, pressed }) => {
           y1={(isSecondSet ? 0 : 10) + i * gap}
           x2={x2}
           y2={(isSecondSet ? 0 : 10) + i * gap}
-          strokeWidth={isSecondSet ? 2.5 : 1.5}
           strokeLinecap="round"
           animatedProps={animatedProps}
-          stroke={
-            isSecondSet ? lineColor : strokeColor + (isSecondSet ? "" : "aa")
-          }
         />
       );
     });
@@ -139,7 +148,10 @@ const Scales: React.FC<ScalesProps> = ({ percent, height, pressed }) => {
       <AnimatedSvg
         width={tapeWidth}
         height={height - 10}
-        style={{ marginTop: 10, marginLeft: -tapeWidth + 16 }}
+        style={{
+          marginTop: 10,
+          marginLeft: -tapeWidth + 16,
+        }}
       >
         {renderLines(true)}
       </AnimatedSvg>
@@ -155,11 +167,11 @@ const Handle: React.FC<{
 }> = ({ pressed, percent, height }) => {
   const strokeColor = useThemeColor({}, "text");
   const isWeb = Platform.OS === "web";
-  const range = isWeb ? 13 : 17;
+  const range = isWeb ? 13 : 15.5;
 
   const animatedProps = useAnimatedProps(() => {
     "worklet";
-    const size = withTiming(pressed.value ? 8 : 6, { duration: 100 });
+    const size = withSpring(pressed.value ? 8 : 4, { duration: 200 });
     return {
       opacity: pressed.value ? 1 : 0,
       r: size,
@@ -193,7 +205,6 @@ const Handle: React.FC<{
     >
       <AnimatedSvg
         width={50}
-        height={50}
         fill="transparent"
         style={!isWeb && animatedStyle}
       >
