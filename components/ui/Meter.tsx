@@ -1,25 +1,21 @@
 import { useThemeColor } from "@/hooks/useThemeColor";
-import React, { Fragment, useEffect, useState } from "react";
+import React, { Fragment } from "react";
 import {
   View,
   StyleSheet,
   ViewStyle,
   useWindowDimensions,
   Platform,
-  PixelRatio,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  runOnUI,
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { opacity } from "react-native-reanimated/lib/typescript/Colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, G, Line, Path, Rect } from "react-native-svg";
+import Svg, { Circle, G, Line, Path } from "react-native-svg";
 interface MeterProps {
   value: number;
   maxValue: number;
@@ -47,7 +43,7 @@ export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
 
   const panGesture = Gesture.Pan()
     .onBegin(() => {
-      depth.value = withTiming(8); // Press-in effect
+      depth.value = withTiming(8, { duration: 150 }); // Press-in effect
       pressed.value = true;
     })
     .onUpdate(({ y }) => {
@@ -61,20 +57,13 @@ export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
         Math.min(Math.max((newValue / maxValue) * 100, 0), 96) / 100;
     })
     .onFinalize(() => {
-      depth.value = withTiming(0); // Ensures reset on release
+      depth.value = withTiming(0, { duration: 150 }); // Ensures reset on release
       pressed.value = false;
     });
 
-  console.log(pressed.value);
-
   return (
     <View style={[styles.container, { height: meterHeight }, style]}>
-      <Scales
-        // value={currentValue}
-        height={meterHeight}
-        percent={percentage}
-        pressed={depth}
-      />
+      <Scales height={meterHeight} percent={percentage} pressed={depth} />
       <GestureDetector gesture={panGesture}>
         <Handle pressed={pressed} percent={percentage} height={meterHeight} />
       </GestureDetector>
@@ -88,96 +77,71 @@ interface ScalesProps {
   percent?: any;
   pressed: any;
 }
-
 const Scales: React.FC<ScalesProps> = ({ percent, height, pressed }) => {
   const totalLines = 200; // Ensure equal lines on all devices
   const gap = height / totalLines;
   const strokeColor = useThemeColor({}, "text");
+  const lineColor = useThemeColor({}, "tint");
   const tapeWidth = 54;
-
   const range = 15;
+
+  const renderLines = (isSecondSet: boolean) => {
+    return [...Array(totalLines)].map((_, i) => {
+      const x2 = isSecondSet
+        ? tapeWidth - 2
+        : i % 5 === 0
+        ? tapeWidth - tapeWidth / 4.2
+        : tapeWidth - tapeWidth / 7;
+
+      const animatedProps = useAnimatedProps(() => {
+        "worklet";
+        const current = totalLines - Math.floor(totalLines * percent.value);
+        const startRange = current - range;
+        const endRange = startRange + range;
+        let curveFactor = 0;
+
+        if (startRange - range / 4 <= i && i < endRange + range / 4) {
+          const normalized =
+            (i - (startRange - range / 4)) /
+            (endRange - startRange - range / 4);
+          curveFactor = (1 - Math.cos(normalized * Math.PI)) * pressed.value;
+        }
+
+        return {
+          transform: [{ translateX: -curveFactor }],
+          ...(isSecondSet && { opacity: i > endRange - range + 5 ? 1 : 0.4 }),
+        };
+      });
+
+      return (
+        <AnimatedLine
+          key={i}
+          x1={tapeWidth - (isSecondSet ? 2 : 0)}
+          y1={(isSecondSet ? 0 : 10) + i * gap}
+          x2={x2}
+          y2={(isSecondSet ? 0 : 10) + i * gap}
+          strokeWidth={isSecondSet ? 2.5 : 1.5}
+          strokeLinecap="round"
+          animatedProps={animatedProps}
+          stroke={
+            isSecondSet ? lineColor : strokeColor + (isSecondSet ? "" : "aa")
+          }
+        />
+      );
+    });
+  };
 
   return (
     <View style={styles.scale}>
       <AnimatedSvg width={tapeWidth} height={height} fill="transparent">
-        {[...Array(totalLines)].map((_, i) => {
-          const x2 =
-            i % 5 === 0
-              ? tapeWidth - tapeWidth / 4.5
-              : tapeWidth - tapeWidth / 7;
-
-          const animatedProps = useAnimatedProps(() => {
-            "worklet";
-            const current = totalLines - Math.floor(totalLines * percent.value);
-            const startRange = current - range;
-            const endRange = startRange + range;
-            let curveFactor = 0;
-            if (startRange - range / 4 <= i && i < endRange + range / 4) {
-              const normalized =
-                (i - (startRange - range / 4)) /
-                (endRange - startRange - range / 4);
-              curveFactor =
-                (1 - Math.cos(normalized * Math.PI)) * pressed.value;
-            }
-            return { transform: [{ translateX: -curveFactor }] };
-          });
-
-          return (
-            <AnimatedLine
-              key={i}
-              x1={tapeWidth}
-              y1={10 + i * gap}
-              x2={x2}
-              animatedProps={animatedProps}
-              y2={10 + i * gap}
-              stroke={strokeColor + "90"}
-              strokeWidth={1.5}
-              strokeLinecap="round"
-            />
-          );
-        })}
+        {renderLines(false)}
       </AnimatedSvg>
       <AnimatedSvg
         width={tapeWidth}
         height={height - 10}
         style={{ marginTop: 10, marginLeft: -tapeWidth + 16 }}
       >
-        {[...Array(totalLines)].map((_, i) => {
-          const x2 = tapeWidth - 2;
-
-          const animatedProps = useAnimatedProps(() => {
-            "worklet";
-            const current = totalLines - Math.floor(totalLines * percent.value);
-            const startRange = current - range;
-            const endRange = startRange + range;
-            let curveFactor = 0;
-            if (startRange - range / 4 <= i && i < endRange + range / 4) {
-              const normalized =
-                (i - (startRange - range / 4)) /
-                (endRange - startRange - range / 4);
-              curveFactor =
-                (1 - Math.cos(normalized * Math.PI)) * pressed.value;
-            }
-            return {
-              transform: [{ translateX: -curveFactor }],
-              opacity: i > endRange - range + 5 ? 1 : 0.5,
-            };
-          });
-
-          return (
-            <AnimatedLine
-              key={i}
-              x1={tapeWidth - 2}
-              y1={i * gap}
-              x2={x2}
-              y2={i * gap}
-              strokeWidth={2.5}
-              strokeLinecap="round"
-              animatedProps={animatedProps} // Apply animatedProps
-              stroke={strokeColor}
-            />
-          );
-        })}
+        {renderLines(true)}
       </AnimatedSvg>
     </View>
   );
@@ -190,13 +154,16 @@ const Handle: React.FC<{
   setValue?: Function;
 }> = ({ pressed, percent, height }) => {
   const strokeColor = useThemeColor({}, "text");
-  const range = 13;
   const isWeb = Platform.OS === "web";
+  const range = isWeb ? 13 : 17;
 
   const animatedProps = useAnimatedProps(() => {
     "worklet";
+    const size = withTiming(pressed.value ? 8 : 6, { duration: 100 });
     return {
       opacity: pressed.value ? 1 : 0,
+      r: size,
+      origin: size,
     };
   });
 
@@ -231,9 +198,8 @@ const Handle: React.FC<{
         style={!isWeb && animatedStyle}
       >
         <AnimatedCircle
-          cx={10}
+          cx={20}
           cy={10}
-          r={6}
           fill={strokeColor}
           stroke={strokeColor}
           strokeWidth={1.5}
@@ -243,7 +209,7 @@ const Handle: React.FC<{
         <AnimatedG
           scale={0.7}
           animatedProps={handleAnimatedProps}
-          translateX={3}
+          translateX={13}
         >
           <Path
             d="M9.1583 1.31208C9.5518 0.698676 10.4482 0.698676 10.8417 1.31208L17.6724 11.9601C18.0993 12.6256 17.6214 13.5 16.8307 13.5H3.16932C2.37859 13.5 1.90067 12.6256 2.32762 11.9601L9.1583 1.31208Z"
@@ -263,13 +229,12 @@ const styles = StyleSheet.create({
   container: {
     // flex: 1,
     width: 120,
-    gap: 12,
     flexDirection: "row",
     // backgroundColor: "red",
     alignSelf: "center",
   },
   scale: {
     flexDirection: "row",
-    // flex: 1,
+    gap: 2,
   },
 });
