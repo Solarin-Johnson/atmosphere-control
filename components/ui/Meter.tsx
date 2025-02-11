@@ -1,16 +1,25 @@
 import { useThemeColor } from "@/hooks/useThemeColor";
-import React, { useEffect } from "react";
-import { View, StyleSheet, ViewStyle, useWindowDimensions } from "react-native";
+import React, { Fragment, useEffect, useState } from "react";
+import {
+  View,
+  StyleSheet,
+  ViewStyle,
+  useWindowDimensions,
+  Platform,
+  PixelRatio,
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnUI,
   useAnimatedProps,
+  useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { opacity } from "react-native-reanimated/lib/typescript/Colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Line, Path, Rect } from "react-native-svg";
+import Svg, { Circle, G, Line, Path, Rect } from "react-native-svg";
 interface MeterProps {
   value: number;
   maxValue: number;
@@ -20,9 +29,15 @@ interface MeterProps {
 const AnimatedSvg = Animated.createAnimatedComponent(Svg);
 const AnimatedLine = Animated.createAnimatedComponent(Line);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedG = Animated.createAnimatedComponent(G);
+
+const calculatePercentage = (value: number, maxValue: number) => {
+  return Math.min(Math.max((value / maxValue) * 100, 0), 96) / 100;
+};
 
 export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
-  const percentage = Math.min(Math.max((value / maxValue) * 100, 0), 100);
+  const currentValue = useSharedValue(value);
+  const percentage = useSharedValue(calculatePercentage(value, maxValue));
   const depth = useSharedValue(0);
   const pressed = useSharedValue(false);
   const insets = useSafeAreaInsets();
@@ -32,8 +47,18 @@ export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
 
   const panGesture = Gesture.Pan()
     .onBegin(() => {
-      depth.value = withTiming(10); // Press-in effect
+      depth.value = withTiming(8); // Press-in effect
       pressed.value = true;
+    })
+    .onUpdate(({ y }) => {
+      const newValue = Math.min(
+        Math.max(currentValue.value - y / 10, 0),
+        maxValue
+      );
+      currentValue.value = newValue;
+
+      percentage.value =
+        Math.min(Math.max((newValue / maxValue) * 100, 0), 96) / 100;
     })
     .onFinalize(() => {
       depth.value = withTiming(0); // Ensures reset on release
@@ -43,42 +68,34 @@ export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
   console.log(pressed.value);
 
   return (
-    <GestureDetector gesture={panGesture}>
-      <View style={[styles.container, { height: meterHeight }, style]}>
-        <Scales
-          value={value}
-          height={meterHeight}
-          percent={percentage / 100}
-          pressed={depth}
-        />
-        <Handle
-          pressed={pressed}
-          percent={percentage / 109}
-          height={meterHeight}
-        />
-      </View>
-    </GestureDetector>
+    <View style={[styles.container, { height: meterHeight }, style]}>
+      <Scales
+        // value={currentValue}
+        height={meterHeight}
+        percent={percentage}
+        pressed={depth}
+      />
+      <GestureDetector gesture={panGesture}>
+        <Handle pressed={pressed} percent={percentage} height={meterHeight} />
+      </GestureDetector>
+    </View>
   );
 };
 
 interface ScalesProps {
   value?: number;
   height: number;
-  percent: number;
+  percent?: any;
   pressed: any;
 }
 
 const Scales: React.FC<ScalesProps> = ({ percent, height, pressed }) => {
-  const step = useSharedValue(0);
   const totalLines = 200; // Ensure equal lines on all devices
   const gap = height / totalLines;
   const strokeColor = useThemeColor({}, "text");
   const tapeWidth = 54;
 
-  const range = 14;
-  const current = Math.floor(totalLines * percent + step.value);
-  const startRange = current - range;
-  const endRange = startRange + range;
+  const range = 15;
 
   return (
     <View style={styles.scale}>
@@ -91,10 +108,14 @@ const Scales: React.FC<ScalesProps> = ({ percent, height, pressed }) => {
 
           const animatedProps = useAnimatedProps(() => {
             "worklet";
+            const current = totalLines - Math.floor(totalLines * percent.value);
+            const startRange = current - range;
+            const endRange = startRange + range;
             let curveFactor = 0;
-            if (startRange - 5 <= i && i < endRange + 5) {
+            if (startRange - range / 4 <= i && i < endRange + range / 4) {
               const normalized =
-                (i - (startRange - 5)) / (endRange - startRange - 3);
+                (i - (startRange - range / 4)) /
+                (endRange - startRange - range / 4);
               curveFactor =
                 (1 - Math.cos(normalized * Math.PI)) * pressed.value;
             }
@@ -119,7 +140,6 @@ const Scales: React.FC<ScalesProps> = ({ percent, height, pressed }) => {
       <AnimatedSvg
         width={tapeWidth}
         height={height - 10}
-        fill="red"
         style={{ marginTop: 10, marginLeft: -tapeWidth + 16 }}
       >
         {[...Array(totalLines)].map((_, i) => {
@@ -127,14 +147,21 @@ const Scales: React.FC<ScalesProps> = ({ percent, height, pressed }) => {
 
           const animatedProps = useAnimatedProps(() => {
             "worklet";
+            const current = totalLines - Math.floor(totalLines * percent.value);
+            const startRange = current - range;
+            const endRange = startRange + range;
             let curveFactor = 0;
-            if (startRange - 5 <= i && i < endRange + 5) {
+            if (startRange - range / 4 <= i && i < endRange + range / 4) {
               const normalized =
-                (i - (startRange - 5)) / (endRange - startRange - 3);
+                (i - (startRange - range / 4)) /
+                (endRange - startRange - range / 4);
               curveFactor =
                 (1 - Math.cos(normalized * Math.PI)) * pressed.value;
             }
-            return { transform: [{ translateX: -curveFactor }] };
+            return {
+              transform: [{ translateX: -curveFactor }],
+              opacity: i > endRange - range + 5 ? 1 : 0.5,
+            };
           });
 
           return (
@@ -143,13 +170,11 @@ const Scales: React.FC<ScalesProps> = ({ percent, height, pressed }) => {
               x1={tapeWidth - 2}
               y1={i * gap}
               x2={x2}
-              animatedProps={animatedProps} // Apply animatedProps
               y2={i * gap}
-              stroke={
-                i > endRange - range + 5 ? strokeColor : strokeColor + "50"
-              }
-              strokeWidth={1.5}
+              strokeWidth={2.5}
               strokeLinecap="round"
+              animatedProps={animatedProps} // Apply animatedProps
+              stroke={strokeColor}
             />
           );
         })}
@@ -158,38 +183,79 @@ const Scales: React.FC<ScalesProps> = ({ percent, height, pressed }) => {
   );
 };
 
-const Handle: React.FC<{ pressed: any; percent: number; height: number }> = ({
-  pressed,
-  percent,
-  height,
-}) => {
+const Handle: React.FC<{
+  pressed: any;
+  percent?: any;
+  height: number;
+  setValue?: Function;
+}> = ({ pressed, percent, height }) => {
   const strokeColor = useThemeColor({}, "text");
-  const current = Math.floor(height * percent);
+  const range = 13;
+  const isWeb = Platform.OS === "web";
 
   const animatedProps = useAnimatedProps(() => {
     "worklet";
     return {
-      transform: [{ scale: pressed.value ? withTiming(1.2) : withTiming(1) }],
+      opacity: pressed.value ? 1 : 0,
     };
   });
 
+  const handleAnimatedProps = useAnimatedProps(() => {
+    "worklet";
+    return {
+      opacity: !pressed.value ? 1 : 0,
+    };
+  });
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const current = height - Math.floor(height * percent.value);
+
+    return {
+      height: 20,
+      marginTop: current - range * 2,
+    };
+  });
+
+  const Wrapper = isWeb ? Animated.View : Fragment;
+
   return (
-    <AnimatedSvg
-      width={50}
-      height={50}
-      fill="transparent"
-      style={{ marginTop: current }}
+    <Wrapper
+      {...(isWeb && {
+        style: animatedStyle,
+      })}
     >
-      <AnimatedCircle
-        cx={10}
-        cy={10}
-        r={8}
-        fill={strokeColor}
-        stroke={strokeColor}
-        strokeWidth={1.5}
-        animatedProps={animatedProps}
-      />
-    </AnimatedSvg>
+      <AnimatedSvg
+        width={50}
+        height={50}
+        fill="transparent"
+        style={!isWeb && animatedStyle}
+      >
+        <AnimatedCircle
+          cx={10}
+          cy={10}
+          r={6}
+          fill={strokeColor}
+          stroke={strokeColor}
+          strokeWidth={1.5}
+          animatedProps={animatedProps}
+        />
+
+        <AnimatedG
+          scale={0.7}
+          animatedProps={handleAnimatedProps}
+          translateX={3}
+        >
+          <Path
+            d="M9.1583 1.31208C9.5518 0.698676 10.4482 0.698676 10.8417 1.31208L17.6724 11.9601C18.0993 12.6256 17.6214 13.5 16.8307 13.5H3.16932C2.37859 13.5 1.90067 12.6256 2.32762 11.9601L9.1583 1.31208Z"
+            fill={strokeColor}
+          />
+          <Path
+            d="M10.8417 27.488C10.4482 28.1014 9.5518 28.1014 9.1583 27.488L2.32762 16.84C1.90067 16.1744 2.37859 15.3 3.16932 15.3L16.8307 15.3C17.6214 15.3 18.0993 16.1744 17.6724 16.84L10.8417 27.488Z"
+            fill={strokeColor}
+          />
+        </AnimatedG>
+      </AnimatedSvg>
+    </Wrapper>
   );
 };
 

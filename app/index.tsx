@@ -7,7 +7,7 @@ export default function App() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.content}>
-        <Meter value={100} maxValue={200} />
+        <Meter value={120} maxValue={200} />
         {/* <Meter value={50} maxValue={200} /> */}
       </SafeAreaView>
     </ThemedView>
