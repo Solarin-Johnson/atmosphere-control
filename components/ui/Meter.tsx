@@ -9,21 +9,17 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  interpolate,
   interpolateColor,
+  runOnJS,
   useAnimatedProps,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, G, Line, Path } from "react-native-svg";
-interface MeterProps {
-  value: number;
-  maxValue: number;
-  style?: ViewStyle;
-}
 
 const AnimatedSvg = Animated.createAnimatedComponent(Svg);
 const AnimatedLine = Animated.createAnimatedComponent(Line);
@@ -34,7 +30,19 @@ const calculatePercentage = (value: number, maxValue: number) => {
   return Math.min(Math.max((value / maxValue) * 100, 0), 96) / 100;
 };
 
-export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
+interface MeterProps {
+  value: number;
+  maxValue: number;
+  style?: ViewStyle;
+  updateValue?: any;
+}
+
+export const Meter: React.FC<MeterProps> = ({
+  value,
+  maxValue,
+  style,
+  updateValue,
+}) => {
   const currentValue = useSharedValue(value);
   const percentage = useSharedValue(calculatePercentage(value, maxValue));
   const depth = useSharedValue(0);
@@ -42,7 +50,10 @@ export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const meterHeight = height - 70 - insets.top - insets.bottom;
-  console.log(insets);
+
+  useDerivedValue(() => {
+    runOnJS(updateValue)(currentValue.value);
+  }, [currentValue]);
 
   const panGesture = Gesture.Pan()
     .onBegin(() => {
@@ -60,7 +71,7 @@ export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
         Math.min(Math.max((newValue / maxValue) * 100, 0), 96) / 100;
     })
     .onFinalize(() => {
-      depth.value = withSpring(0, { duration: 200 }); // Ensures reset on release
+      depth.value = withSpring(0, { duration: 200 });
       pressed.value = false;
     });
 
@@ -238,7 +249,6 @@ const Handle: React.FC<{
 
 const styles = StyleSheet.create({
   container: {
-    // flex: 1,
     width: 120,
     flexDirection: "row",
     // backgroundColor: "red",
