@@ -53,12 +53,12 @@ export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
 
   const panGesture = Gesture.Pan()
     .onBegin(() => {
-      depth.value = withSpring(8, { duration: 200 }); // Press-in effect
+      depth.value = withSpring(10, { duration: 200 }); // Press-in effect
       pressed.value = true;
     })
     .onUpdate(({ y }) => {
       const newValue = Math.round(
-        Math.min(Math.max(currentValue.value - y / 10, 0), maxValue)
+        Math.min(Math.max(currentValue.value + 5 - y / 10, 0), maxValue)
       );
 
       currentValue.value = newValue;
@@ -142,7 +142,7 @@ const Scales: React.FC<ScalesProps> = memo(({ percent, height, pressed }) => {
       const x2 = isSecondSet
         ? tapeWidth - 2
         : i % 5 === 0
-        ? tapeWidth - tapeWidth / 4.2
+        ? tapeWidth - tapeWidth / 4
         : tapeWidth - tapeWidth / 7;
 
       const isInRange = useDerivedValue(() => {
@@ -226,7 +226,6 @@ const Handle: React.FC<{
   const strokeColor = useThemeColor({}, "text");
   const isWeb = Platform.OS === "web";
   const range = isWeb ? 13 : 15.5;
-
   const animatedProps = useAnimatedProps(() => {
     "worklet";
     const size = withSpring(pressed.value ? 8 : 4, { duration: 200 });
