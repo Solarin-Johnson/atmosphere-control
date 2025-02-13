@@ -11,7 +11,6 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   interpolateColor,
-  runOnJS,
   useAnimatedProps,
   useAnimatedStyle,
   useDerivedValue,
@@ -21,7 +20,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, G, Line, Path } from "react-native-svg";
-import { ReText } from "react-native-redash";
 import Monitor, { MonitorCard } from "./Monitor";
 
 const AnimatedSvg = Animated.createAnimatedComponent(Svg);
@@ -53,7 +51,7 @@ export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
 
   const panGesture = Gesture.Pan()
     .onBegin(() => {
-      depth.value = withSpring(10, { duration: 200 }); // Press-in effect
+      depth.value = withSpring(8, { duration: 240 }); // Press-in effect
       pressed.value = true;
     })
     .onUpdate(({ y }) => {
@@ -69,7 +67,7 @@ export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
     })
     .onFinalize(() => {
       if (pressed.value) {
-        depth.value = withSpring(0, { duration: 200 });
+        depth.value = withSpring(0, { duration: 240 });
         pressed.value = false;
       }
     });
@@ -81,7 +79,6 @@ export const Meter: React.FC<MeterProps> = ({ value, maxValue, style }) => {
         <GestureDetector gesture={panGesture}>
           <Handle pressed={pressed} percent={percentage} height={meterHeight} />
         </GestureDetector>
-        {/* <ReText text={currentValueString} style={{ color: "red" }} /> */}
       </View>
       <Monitor>
         <MonitorCard label="Humidity" value={45} unit="%" faded />
@@ -103,13 +100,13 @@ interface ScalesProps {
 }
 
 const Scales: React.FC<ScalesProps> = memo(({ percent, height, pressed }) => {
-  const totalLines = 120; // Ensure equal lines on all devices
+  const totalLines = 100; // Ensure equal lines on all devices
   const gap = height / totalLines;
   const strokeColor = useThemeColor({}, "text");
   const lowColor = useThemeColor({}, "low");
   const highColor = useThemeColor({}, "high");
   const tapeWidth = 54;
-  const range = 10;
+  const range = 8;
 
   const current = useDerivedValue(() => {
     return totalLines - Math.floor(totalLines * percent.value);
@@ -179,7 +176,6 @@ const Scales: React.FC<ScalesProps> = memo(({ percent, height, pressed }) => {
         return {
           transform: [{ translateX: curveFactor.value }],
           stroke: strokeColorAnimated.value,
-          strokeWidth: isSecondSet ? 2.8 : 1.5,
           ...(isSecondSet && { opacity: opacity.value }),
         };
       });
@@ -191,6 +187,7 @@ const Scales: React.FC<ScalesProps> = memo(({ percent, height, pressed }) => {
           y1={(isSecondSet ? 0 : 10) + i * gap}
           x2={x2}
           y2={(isSecondSet ? 0 : 10) + i * gap}
+          strokeWidth={isSecondSet ? 2.8 : 1.5}
           strokeLinecap="round"
           animatedProps={animatedProps}
         />
@@ -226,6 +223,7 @@ const Handle: React.FC<{
   const strokeColor = useThemeColor({}, "text");
   const isWeb = Platform.OS === "web";
   const range = isWeb ? 13 : 15.5;
+
   const animatedProps = useAnimatedProps(() => {
     "worklet";
     const size = withSpring(pressed.value ? 8 : 4, { duration: 200 });
@@ -248,8 +246,7 @@ const Handle: React.FC<{
 
     return {
       height: 80,
-      marginTop: current - range * 2 - 22,
-      // backgroundColor: "red",
+      marginTop: current - range * 2 - 25,
     };
   });
 
@@ -300,7 +297,6 @@ const styles = StyleSheet.create({
   container: {
     width: 120,
     flexDirection: "row",
-    // backgroundColor: "red",
     alignSelf: "center",
   },
   scale: {
